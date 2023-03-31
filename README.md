@@ -90,7 +90,7 @@ with ct.neural_engine.scope():
 
 These both look like exactly the kind of thing I want. Unfortunately it seems that neither of them actually exist 😞
 
-Googling for myself I saw a few suggestions to use a Python library [asitop](https://github.com/tlkh/asitop) and watching if the ANE starts consuming any power.
+Googling for myself I saw a few suggestions to use a Python library [asitop](https://github.com/tlkh/asitop) and watching if the ANE starts consuming any power. (this is )
 
 I was unable to observe any flicker of power consumption from ANE when inferring individual phrases using the current `server.py`.
 
@@ -101,3 +101,31 @@ Either:
 - I need to batch process a big chunk of inferrences to get a noticeable power consumption
 
 Alternatively, we could ask if ~4.5ms is a fast inference for this model, perhaps by running the unconverted version under PyTorch and comparing timings.
+
+### Update
+
+Using the following approach I was able to observe small power spikes on the ANE when running inference:
+
+```
+sudo powermetrics --sample-rate=500 | grep -i "ANE Power"
+```
+
+`powermetrics` is the Apple cli tool that generates the data consumed by `asitop`. Setting a short sample rate (in ms) allowed to observe the tiny spikes from my tiny inputs:
+
+```
+ANE Power: 0 mW
+ANE Power: 29 mW
+ANE Power: 0 mW
+ANE Power: 0 mW
+ANE Power: 0 mW
+ANE Power: 0 mW
+ANE Power: 0 mW
+ANE Power: 0 mW
+ANE Power: 0 mW
+ANE Power: 0 mW
+ANE Power: 0 mW
+ANE Power: 0 mW
+ANE Power: 37 mW
+ANE Power: 0 mW
+ANE Power: 0 mW
+```
