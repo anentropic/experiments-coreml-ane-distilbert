@@ -123,24 +123,21 @@ def run_server():
     if not parent_conn.recv():
         raise RuntimeError("Child process failed to load model")
 
-    while True:
-        input_str = input("Enter text to classify (or 'q' to quit): ")
+    try:
+        while True:
+            input_str = input("Enter text to classify (or 'ctrl+D' to quit): ")
+            parent_conn.send(input_str)
 
-        if input_str.lower() == 'q':
-            # tell child to close their conn and finish
-            parent_conn.send(None)
-            break
-
-        parent_conn.send(input_str)
-
-        output = parent_conn.recv()
-
-        prediction_index = np.argmax(output)
-
-        print(
-            f"Sentiment prediction: {MODEL_RESULT_KEYS[prediction_index]} "
-            f"({output[0][prediction_index]:.2%})"
-        )
+            output = parent_conn.recv()
+            prediction_index = np.argmax(output)
+            print(
+                f"Sentiment prediction: {MODEL_RESULT_KEYS[prediction_index]} "
+                f"({output[0][prediction_index]:.2%})"
+            )
+    except (EOFError, KeyboardInterrupt):
+        # tell child to close their conn and finish
+        print()
+        parent_conn.send(None)
 
     # Clean up resources and wait for the child process to terminate before exiting
     logger.debug("Waiting for child process to terminate...")

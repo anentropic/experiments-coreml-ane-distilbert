@@ -4,6 +4,8 @@ Experimenting with https://github.com/apple/ml-ane-transformers
 
 Basically, Apple provide a version of DistilBERT model that should run on the Neural Engine (ANE) co-processor of Apple Silicon devices, when run via CoreML.
 
+The specific model they provide has been pre-trained on the [SST 2](https://huggingface.co/datasets/sst2) dataset, so it provides sentiment classification (either "positive" or "negative").
+
 This repo contains a trivial experiment with this model - a cli app you can run that will classify the sentiment of your inputs.
 
 Prerequisites:
@@ -23,11 +25,11 @@ Example usage:
 
 ```
 $ python server.py
-Enter text to classify (or 'q' to quit): I like cheese
+Enter text to classify (or 'ctrl+D' to quit): I like cheese
 Sentiment prediction: positive (95.75%)
-Enter text to classify (or 'q' to quit): I hate cheesecake
+Enter text to classify (or 'ctrl+D' to quit): I hate cheesecake
 Sentiment prediction: negative (99.63%)
-Enter text to classify (or 'q' to quit): q
+Enter text to classify (or 'ctrl+D' to quit):
 ```
 
 With some logging we can observe the startup...
