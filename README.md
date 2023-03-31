@@ -6,7 +6,20 @@ Basically, Apple provide a version of DistilBERT model that should run on the Ne
 
 This repo contains a trivial experiment with this model - a cli app you can run that will classify the sentiment of your inputs.
 
-Example:
+Prerequisites:
+
+- an Apple Silicon mac
+- Python 3.10
+- [install Poetry](https://python-poetry.org/docs/#installation)
+
+Prepare the environment:
+
+```
+poetry install
+poetry shell
+```
+
+Example usage:
 
 ```
 $ python server.py
@@ -16,8 +29,6 @@ Enter text to classify (or 'q' to quit): I hate cheesecake
 Sentiment prediction: negative (99.63%)
 Enter text to classify (or 'q' to quit): q
 ```
-
-My macbook air is a 1st gen M1, 16GB RAM.
 
 With some logging we can observe the startup...
 
@@ -36,6 +47,8 @@ Tokenized input in 0.89ms
 Performing inference...
 Inferred in 4.71ms
 ```
+
+(My macbook air is a 1st gen M1, 16GB RAM)
 
 The inference time seems to be highly variable. The first inference can take 100-300ms, but it gets much faster (single digits ms) if you make rapid-fire requests.  I am guessing perhaps it needs constant activity to have all the code/data primed in memory (cache?) in some way, and a short idle is enough for it to need reloading.  This is distinct from the ~5 seconds needed to load and initialise the CoreML model itself and the tokenizer.
 
@@ -75,7 +88,7 @@ with ct.neural_engine.scope():
 
 These both look like exactly the kind of thing I want. Unfortunately it seems that neither of them actually exist 😞
 
-Googling for myself I saw a few suggestions to use a Python library [https://github.com/tlkh/asitop](asitop) and watching if the ANE starts consuming any power.
+Googling for myself I saw a few suggestions to use a Python library [asitop](https://github.com/tlkh/asitop) and watching if the ANE starts consuming any power.
 
 I was unable to observe any flicker of power consumption from ANE when inferring individual phrases using the current `server.py`.
 
