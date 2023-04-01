@@ -183,3 +183,33 @@ This is big enough to observe with `asitop` too:
 
 ![Screenshot 2023-04-01 at 11 06 54](https://user-images.githubusercontent.com/147840/229279886-f45400ab-16b8-41ab-891f-5329867e983a.png)
 
+### Update
+
+I tried tracking the memory usage when running the benchmarks, using [memray](https://bloomberg.github.io/memray/).
+
+Disclaimer: no idea how accurate this is, given that neither code path is straightforward Python code.
+
+I'm also not entirely sure how to read the Summary report that memray produces. It looks to me like the 'Total Memory' column is cumulative, with the overall total in the first row
+
+For `python -m memray run experiment/benchmark.py --coreml` I get results like:
+```
+┃                                                     ┃    <Total ┃     Total ┃
+┃ Location                                            ┃   Memory> ┃  Memory % ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━╇
+┃ _run_code at                                        │ 182.612MB │    95.51% │
+```
+Possibly this means the real total memory is 191MB?
+
+I get basically the same numbers if I run memray with the `--native` flag.
+
+For `python -m memray run experiment/benchmark.py --pytorch` I get results like:
+```
+┃                                                     ┃    <Total ┃     Total ┃
+┃ Location                                            ┃   Memory> ┃  Memory % ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━╇
+│ _run_code at                                        │   1.201GB │    96.80% │
+```
+
+Again, similar number with the `--native` flag.
+
+So, if this is measuring anything meaningful, it seems like the CoreML optimised model uses significantly (~6.6x) less memory.
