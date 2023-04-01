@@ -129,3 +129,11 @@ ANE Power: 37 mW
 ANE Power: 0 mW
 ANE Power: 0 mW
 ```
+
+### Update
+
+I implemented the PyTorch version as `server_pytorch.py`.
+
+Roughly I see rapid-fire cli queries take 50-70ms, so it's approx 10x slower. And no power spikes on the ANE as expected, it's not being used.
+
+Next step: batch benchmarks.
