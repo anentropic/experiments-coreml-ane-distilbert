@@ -1,21 +1,11 @@
 import multiprocessing as mp
-import numpy as np
-import os
 import sys
 
-import torch
-import torch.nn.functional as F
+import numpy as np
 from loguru import logger
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
+from loader import load_coreml
 from utils import timer
-
-
-"""
-This is Apple's "ane-distilbert-base-uncased-finetuned-sst-2-english" model
-but running under PyTorch instead of CoreML, so won't actually make use of
-the ANE chip.
-"""
 
 
 logger.configure(handlers=[
@@ -26,13 +16,6 @@ logger.configure(handlers=[
     }
 ])
 
-# prevent "Disabling parallelism to avoid deadlocks" warning from huggingface/tokenizers
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
-
-
-MODEL_REPO = "apple/ane-distilbert-base-uncased-finetuned-sst-2-english"
-
-MODEL_FILENAME = "DistilBERT_fp16.mlpackage"
 
 MODEL_RESULT_KEYS = {
     0: "negative",
@@ -40,25 +23,9 @@ MODEL_RESULT_KEYS = {
 }
 
 
-def _load_model():
-    logger.debug("Loading CoreML model...")
-    with timer() as timing:
-        mlmodel = AutoModelForSequenceClassification.from_pretrained(
-            MODEL_REPO, trust_remote_code=True, return_dict=False, revision="main"
-        )
-    logger.debug(f"Loaded CoreML model in {timing.execution_time_ns / 1e6:.2f}ms")
-
-    logger.debug("Loading tokenizer...")
-    with timer() as timing:
-        tokenizer = AutoTokenizer.from_pretrained(MODEL_REPO)
-    logger.debug(f"Loaded tokenizer in {timing.execution_time_ns / 1e6:.2f}ms")
-
-    return mlmodel, tokenizer
-
-
 def child_process(conn):
     try:
-        mlmodel, tokenizer = _load_model()
+        mlmodel, tokenizer = load_coreml()
     except:
         import traceback
         traceback.print_exc()
@@ -80,7 +47,7 @@ def child_process(conn):
         with timer() as timing:
             inputs = tokenizer(
                 [input_str],
-                return_tensors="pt",
+                return_tensors="np",
                 max_length=128,
                 padding="max_length",
             )
@@ -88,13 +55,16 @@ def child_process(conn):
         
         logger.debug("Performing inference...")
         with timer() as timing:
-            with torch.no_grad():
-                outputs = mlmodel(**inputs)
+            outputs_coreml = mlmodel.predict({
+                "input_ids": inputs["input_ids"].astype(np.int32),
+                "attention_mask": inputs["attention_mask"].astype(np.int32),
+            })
         logger.debug(f"Inferred in {timing.execution_time_ns / 1e6:.2f}ms")
 
         # Apply softmax to the logits output
         # (converts them into probabilities that sum to 1)
-        probs = F.softmax(outputs[0], dim=1)
+        exp_ = np.exp(outputs_coreml['logits'])
+        probs = exp_ / np.sum(exp_)
 
         conn.send(probs.tolist())
 

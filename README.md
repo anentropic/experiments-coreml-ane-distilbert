@@ -24,7 +24,7 @@ poetry shell
 Example usage:
 
 ```
-$ python server.py
+$ python experiment/server.py
 Enter text to classify (or 'ctrl+D' to quit): I like cheese
 Sentiment prediction: positive (95.75%)
 Enter text to classify (or 'ctrl+D' to quit): I hate cheesecake
@@ -92,7 +92,7 @@ These both look like exactly the kind of thing I want. Unfortunately it seems th
 
 Googling for myself I saw a few suggestions to use a Python library [asitop](https://github.com/tlkh/asitop) and watching if the ANE starts consuming any power. (this is )
 
-I was unable to observe any flicker of power consumption from ANE when inferring individual phrases using the current `server.py`.
+I was unable to observe any flicker of power consumption from ANE when inferring individual phrases using the current `experiment/server.py`.
 
 Either:
 
@@ -132,8 +132,54 @@ ANE Power: 0 mW
 
 ### Update
 
-I implemented the PyTorch version as `server_pytorch.py`.
+I implemented the PyTorch version as `experiment/server_pytorch.py`.
 
 Roughly I see rapid-fire cli queries take 50-70ms, so it's approx 10x slower. And no power spikes on the ANE as expected, it's not being used.
 
-Next step: batch benchmarks.
+### Update
+
+To avoid having to manually enter prompts in quick succession via the cli, I made `experiments/benchmark.py`.
+
+This loads the SST2 dataset (which the model was originally trained on) and runs inference on the 1821 examples in the "test" segment of the dataset.
+
+Unfortunately the `coremltools` Python library [does not support batch inference](https://github.com/apple/coremltools/issues/196) (which is available in CoreML via ObjC) ... I would imagine batch inference is possible in PyTorch too. So I have just done a series of individual inferences in a tight loop, after pre-prepping the tokens etc.
+
+We can see some expected results:
+
+```
+$ python experiment/benchmark.py --coreml
+Inferred 1821 inputs in 7980.14ms
+
+$ python experiment/benchmark.py --pytorch
+Inferred 1821 inputs in 80253.39ms
+```
+
+We average ~4.4ms per inference with CoreML on the ANE, and ~44s under PyTorch on the CPU (or GPU?). So the CoreML version accelerated on the ANE is almost exactly 10x faster.
+
+We can see a bigger power spike on the ANE this time:
+```
+ANE Power: 0 mW
+ANE Power: 8 mW
+ANE Power: 1325 mW
+ANE Power: 1460 mW
+ANE Power: 1658 mW
+ANE Power: 1732 mW
+ANE Power: 1819 mW
+ANE Power: 1461 mW
+ANE Power: 1282 mW
+ANE Power: 1414 mW
+ANE Power: 2775 mW
+ANE Power: 2510 mW
+ANE Power: 2331 mW
+ANE Power: 1542 mW
+ANE Power: 1587 mW
+ANE Power: 1494 mW
+ANE Power: 1405 mW
+ANE Power: 891 mW
+ANE Power: 0 mW
+```
+
+This is big enough to observe with `asitop` too:
+
+![Screenshot 2023-04-01 at 11 06 54](https://user-images.githubusercontent.com/147840/229279886-f45400ab-16b8-41ab-891f-5329867e983a.png)
+

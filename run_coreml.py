@@ -2,14 +2,17 @@ import coremltools as ct
 import numpy as np
 from transformers import AutoTokenizer
 
-from utils import timer
+from experiment.utils import timer
 
 """
 adapted from:
 https://huggingface.co/apple/ane-distilbert-base-uncased-finetuned-sst-2-english
 (incomplete example at bottom of page)
 
-see server.py for a usable program built on this example
+NOTE: you need to have manually downloaded the model file "DistilBERT_fp16.mlpackage"
+project root directory for this to work.
+
+see experiment/server.py for a usable program built on this example
 """
 
 print("Loading tokenizer...")
