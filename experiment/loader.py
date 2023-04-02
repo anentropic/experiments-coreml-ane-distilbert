@@ -71,12 +71,12 @@ def load_coreml():
 
 
 def load_pytorch():
-    logger.debug("Loading CoreML model...")
+    logger.debug("Loading PyTorch model...")
     with timer() as timing:
         model = AutoModelForSequenceClassification.from_pretrained(
             MODEL_REPO, trust_remote_code=True, return_dict=False, revision="main"
         )
-    logger.debug(f"Loaded CoreML model in {timing.execution_time_ns / 1e6:.2f}ms")
+    logger.debug(f"Loaded PyTorch model in {timing.execution_time_ns / 1e6:.2f}ms")
 
     logger.debug("Loading tokenizer...")
     with timer() as timing:

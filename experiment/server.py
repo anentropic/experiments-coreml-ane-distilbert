@@ -25,7 +25,7 @@ MODEL_RESULT_KEYS = {
 
 def child_process(conn):
     try:
-        mlmodel, tokenizer = load_coreml()
+        model, tokenizer = load_coreml()
     except:
         import traceback
         traceback.print_exc()
@@ -55,7 +55,7 @@ def child_process(conn):
         
         logger.debug("Performing inference...")
         with timer() as timing:
-            outputs_coreml = mlmodel.predict({
+            outputs = model.predict({
                 "input_ids": inputs["input_ids"].astype(np.int32),
                 "attention_mask": inputs["attention_mask"].astype(np.int32),
             })
@@ -63,7 +63,7 @@ def child_process(conn):
 
         # Apply softmax to the logits output
         # (converts them into probabilities that sum to 1)
-        exp_ = np.exp(outputs_coreml['logits'])
+        exp_ = np.exp(outputs['logits'])
         probs = exp_ / np.sum(exp_)
 
         conn.send(probs.tolist())

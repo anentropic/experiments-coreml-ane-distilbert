@@ -2,9 +2,9 @@
 
 Experimenting with https://github.com/apple/ml-ane-transformers
 
-Basically, Apple provide a version of DistilBERT model that should run on the Neural Engine (ANE) co-processor of Apple Silicon devices, when run via CoreML.
+Basically, Apple provide a version of DistilBERT model that should run on the Neural Engine (ANE) co-processor of Apple Silicon devices, when run via CoreML. It is derived from `bert-base-uncased` which was a 110M param model (but DistilBERT may be smaller?).
 
-The specific model they provide has been pre-trained on the [SST 2](https://huggingface.co/datasets/sst2) dataset, so it provides sentiment classification (either "positive" or "negative").
+The specific model they provide has been pre-trained on the [SST 2](https://huggingface.co/datasets/sst2) dataset, so it provides sentiment classification (either "positive" or "negative"). Being "uncased" it doesn't care about capitalisation of the input.
 
 This repo contains a trivial experiment with this model - a cli app you can run that will classify the sentiment of your inputs.
 
@@ -213,3 +213,11 @@ For `python -m memray run experiment/benchmark.py --pytorch` I get results like:
 Again, similar number with the `--native` flag.
 
 So, if this is measuring anything meaningful, it seems like the CoreML optimised model uses significantly (~6.6x) less memory.
+
+## Further questions
+
+We compared here the same model, `apple/ane-distilbert-base-uncased-finetuned-sst-2-english`, run via either PyTorch or CoreML.
+
+But, as I understand it, that model is a rewrite of the original DistilBERT PyTorch model, changing some details ([as described here](https://machinelearning.apple.com/research/neural-engine-transformers)) to ensure that CoreML will be able to run it on the ANE.
+
+It's possible those changes harm the PyTorch performance?  How does say [`distilbert-base-uncased-finetuned-sst-2-english`](https://huggingface.co/distilbert-base-uncased-finetuned-sst-2-english) compare, running under PyTorch?
