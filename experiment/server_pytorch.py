@@ -6,14 +6,17 @@ import torch
 import torch.nn.functional as F
 from loguru import logger
 
-from loader import load_pytorch
-from utils import timer
+from .loader import load_pytorch, MODEL_REPO
+from .utils import timer
 
 
 """
 This is Apple's "ane-distilbert-base-uncased-finetuned-sst-2-english" model
 but running under PyTorch instead of CoreML, so won't actually make use of
 the ANE chip.
+
+Can also pass a model name as an argument to the script to load a different
+model from HuggingFace.
 """
 
 
@@ -27,14 +30,14 @@ logger.configure(handlers=[
 
 
 MODEL_RESULT_KEYS = {
-    0: "negative",
-    1: "positive",
+    0: "NEGATIVE",
+    1: "POSITIVE",
 }
 
 
-def child_process(conn):
+def child_process(conn, model_name: str):
     try:
-        mlmodel, tokenizer = load_pytorch()
+        mlmodel, tokenizer = load_pytorch(model_name)
     except:
         import traceback
         traceback.print_exc()
@@ -68,6 +71,8 @@ def child_process(conn):
                 outputs = mlmodel(**inputs)
         logger.debug(f"Inferred in {timing.execution_time_ns / 1e6:.2f}ms")
 
+        logger.debug(outputs)
+
         # Apply softmax to the logits output
         # (converts them into probabilities that sum to 1)
         probs = F.softmax(outputs[0], dim=1)
@@ -79,8 +84,10 @@ def child_process(conn):
 
 
 def run_server():
+    model_name = sys.argv[1] if len(sys.argv) > 1 else MODEL_REPO
+
     parent_conn, child_conn = mp.Pipe()
-    p = mp.Process(target=child_process, args=(child_conn,))
+    p = mp.Process(target=child_process, args=(child_conn, model_name))
     p.start()
 
     # Wait for the child process to signal that it's ready to receive inputs

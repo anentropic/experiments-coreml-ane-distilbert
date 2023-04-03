@@ -250,6 +250,25 @@ python-versions = "*"
 tests = ["asttokens", "littleutils", "pytest", "rich"]
 
 [[package]]
+name = "exporters"
+version = "0.0.1"
+description = "Core ML and TF Lite exporters for Hugging Face Transformers"
+category = "dev"
+optional = false
+python-versions = ">=3.6.0"
+develop = false
+
+[package.dependencies]
+coremltools = ">=5.0"
+transformers = ">=4.26.1"
+
+[package.source]
+type = "git"
+url = "https://github.com/huggingface/exporters.git"
+reference = "HEAD"
+resolved_reference = "be8b8f636689ba3b98b16c2d443a32792a636ec3"
+
+[[package]]
 name = "fancycompleter"
 version = "0.9.1"
 description = "colorful TAB completion for Python prompt"
@@ -1044,7 +1063,7 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.10"
-content-hash = "e05f9138767b7bdf7ccbba62264913b2283ac9657be32cb1a0e5a057f2816866"
+content-hash = "0d16a64955d6a9d61b16fb94bbfe53bf376f55ebba659246527d74ca14c01c40"
 
 [metadata.files]
 aiohttp = [
@@ -1295,6 +1314,7 @@ executing = [
     {file = "executing-1.2.0-py2.py3-none-any.whl", hash = "sha256:0314a69e37426e3608aada02473b4161d4caf5a4b244d1d0c48072b8fee7bacc"},
     {file = "executing-1.2.0.tar.gz", hash = "sha256:19da64c18d2d851112f09c287f8d3dbbdf725ab0e569077efb6cdcbd3497c107"},
 ]
+exporters = []
 fancycompleter = [
     {file = "fancycompleter-0.9.1-py3-none-any.whl", hash = "sha256:dd076bca7d9d524cc7f25ec8f35ef95388ffef9ef46def4d3d25e9b044ad7080"},
     {file = "fancycompleter-0.9.1.tar.gz", hash = "sha256:09e0feb8ae242abdfd7ef2ba55069a46f011814a80fe5476be48f51b00247272"},

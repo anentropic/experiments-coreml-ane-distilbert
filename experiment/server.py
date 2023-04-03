@@ -1,11 +1,12 @@
 import multiprocessing as mp
 import sys
+from dataclasses import dataclass
 
 import numpy as np
 from loguru import logger
 
-from loader import load_coreml
-from utils import timer
+from .loader import load_coreml
+from .utils import timer
 
 
 logger.configure(handlers=[
@@ -17,15 +18,44 @@ logger.configure(handlers=[
 ])
 
 
-MODEL_RESULT_KEYS = {
-    0: "negative",
-    1: "positive",
-}
+@dataclass(frozen=True)
+class Result:
+    probabilities: dict[float]
+    predicted_class: str
 
 
-def child_process(conn):
+def get_apple_result(outputs):
+    """
+    Parse the output from the Apple version of the model
+    """
+    exp_ = np.exp(outputs['logits'])
+    # Apply softmax to the logits output
+    # (converts them into probabilities that sum to 1)
+    probs = exp_ / np.sum(exp_)
+    prediction_index = np.argmax(probs)  # 0 or 1
+    return Result(
+        probabilities={
+            "NEGATIVE": probs[0][0],
+            "POSITIVE": probs[0][1],
+        },
+        predicted_class="POSITIVE" if prediction_index else "NEGATIVE",
+    )
+
+
+def get_exported_result(outputs):
+    """
+    Parse the output from a version of the model exported via
+    https://github.com/huggingface/exporters
+    """
+    return Result(
+        probabilities=outputs['probabilities'],
+        predicted_class=outputs['classLabel'],
+    )
+
+
+def child_process(conn, model_path: str | None):
     try:
-        model, tokenizer = load_coreml()
+        model, tokenizer = load_coreml(model_path)
     except:
         import traceback
         traceback.print_exc()
@@ -61,20 +91,24 @@ def child_process(conn):
             })
         logger.debug(f"Inferred in {timing.execution_time_ns / 1e6:.2f}ms")
 
-        # Apply softmax to the logits output
-        # (converts them into probabilities that sum to 1)
-        exp_ = np.exp(outputs['logits'])
-        probs = exp_ / np.sum(exp_)
+        logger.debug(outputs)
 
-        conn.send(probs.tolist())
+        if model_path:
+            result = get_exported_result(outputs)
+        else:
+            result = get_apple_result(outputs)
+
+        conn.send(result)
 
     # Clean up resources and exit the child process
     conn.close()
 
 
 def run_server():
+    model_path = sys.argv[1] if len(sys.argv) > 1 else None
+
     parent_conn, child_conn = mp.Pipe()
-    p = mp.Process(target=child_process, args=(child_conn,))
+    p = mp.Process(target=child_process, args=(child_conn, model_path))
     p.start()
 
     # Wait for the child process to signal that it's ready to receive inputs
@@ -86,11 +120,10 @@ def run_server():
             input_str = input("Enter text to classify (or 'ctrl+D' to quit): ")
             parent_conn.send(input_str)
 
-            output = parent_conn.recv()
-            prediction_index = np.argmax(output)
+            result = parent_conn.recv()
             print(
-                f"Sentiment prediction: {MODEL_RESULT_KEYS[prediction_index]} "
-                f"({output[0][prediction_index]:.2%})"
+                f"Sentiment prediction: {result.predicted_class} "
+                f"({result.probabilities[result.predicted_class]:.2%})"
             )
     except (EOFError, KeyboardInterrupt):
         # tell child to close their conn and finish

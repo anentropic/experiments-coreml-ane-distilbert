@@ -6,8 +6,8 @@ import torch
 from datasets import load_dataset
 from loguru import logger
 
-from loader import load_coreml, load_pytorch
-from utils import timer
+from .loader import load_coreml, load_pytorch, MODEL_REPO
+from .utils import timer
 
 
 logger.configure(handlers=[
@@ -50,8 +50,8 @@ def load_data() -> list[str]:
     ]
 
 
-def coreml(inputs: list[str]):
-    model, tokenizer = load_coreml()
+def coreml(model_path: str | None, inputs: list[str]):
+    model, tokenizer = load_coreml(model_path)
 
     logger.debug("Tokenizing inputs...")
     encoded_inputs = []
@@ -76,8 +76,8 @@ def coreml(inputs: list[str]):
     print(f"Inferred {len(inputs)} inputs in {timing.execution_time_ns / 1e6:.2f}ms")
 
 
-def pytorch(inputs: list[str]):
-    model, tokenizer = load_pytorch()
+def pytorch(model_name: str, inputs: list[str]):
+    model, tokenizer = load_pytorch(model_name)
         
     logger.debug("Tokenizing inputs...")
     encoded_inputs = [
@@ -104,12 +104,23 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--coreml", action="store_true")
     parser.add_argument("--pytorch", action="store_true")
+    parser.add_argument("--coreml-model-path", type=str, nargs="*")
+    parser.add_argument("--pytorch-model-name", type=str)
     args = parser.parse_args()
 
-    if not (args.coreml or args.pytorch):
-        print("Please specify --coreml or --pytorch")
+    if not (args.coreml or args.pytorch or args.coreml_model_path or args.pytorch_model_name):
+        print(
+            "Please specify at least one of: "
+            "--coreml, --coreml-model-path, "
+            "--pytorch, --pytorch-model-name"
+        )
         sys.exit(1)
     if args.coreml:
-        coreml(inputs)
+        coreml(None, inputs)
     if args.pytorch:
-        pytorch(inputs)
+        pytorch(MODEL_REPO, inputs)
+    if args.coreml_model_path:
+        for model_path in args.coreml_model_path:
+            coreml(model_path, inputs)
+    if args.pytorch_model_name:
+        pytorch(args.pytorch_model_name, inputs)

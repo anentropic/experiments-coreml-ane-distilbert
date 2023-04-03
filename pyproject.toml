@@ -18,6 +18,7 @@ pdbpp = "^0.10.3"
 asitop = "^0.0.23"
 huggingface-hub = {extras = ["cli"], version = "^0.13.3"}
 memray = "^1.7.0"
+exporters = {git = "https://github.com/huggingface/exporters.git"}
 
 [build-system]
 requires = ["poetry-core"]

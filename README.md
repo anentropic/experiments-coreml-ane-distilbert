@@ -24,7 +24,7 @@ poetry shell
 Example usage:
 
 ```
-$ python experiment/server.py
+$ python -m experiment.server
 Enter text to classify (or 'ctrl+D' to quit): I like cheese
 Sentiment prediction: positive (95.75%)
 Enter text to classify (or 'ctrl+D' to quit): I hate cheesecake
@@ -136,6 +136,50 @@ I implemented the PyTorch version as `experiment/server_pytorch.py`.
 
 Roughly I see rapid-fire cli queries take 50-70ms, so it's approx 10x slower. And no power spikes on the ANE as expected, it's not being used.
 
+One curious thing I observed is it doesn't always give the same prediction as the CoreML model (!)
+
+For example:
+```
+$ python -m experiment.server
+Enter text to classify (or 'ctrl+D' to quit): I like cheese
+Tokenizing input...
+Tokenized input in 0.57ms
+Performing inference...
+Inferred in 139.39ms
+{'logits': array([[-1.5722656,  1.5429688]], dtype=float32)}
+Sentiment prediction: POSITIVE (95.75%)
+
+$ python -m experiment.server_pytorch
+Enter text to classify (or 'ctrl+D' to quit): I like cheese
+Tokenizing input...
+Tokenized input in 0.63ms
+Performing inference...
+Inferred in 70.10ms
+(tensor([[ 0.1999, -0.2167]]),)
+Sentiment prediction: NEGATIVE (60.27%)
+```
+
+Other inputs give more similar results:
+```
+$ python -m experiment.server
+Enter text to classify (or 'ctrl+D' to quit): I like cheesecake
+Tokenizing input...
+Tokenized input in 0.61ms
+Performing inference...
+Inferred in 131.57ms
+{'logits': array([[-2.9511719,  3.0585938]], dtype=float32)}
+Sentiment prediction: POSITIVE (99.76%)
+
+$ python -m experiment.server_pytorch
+Enter text to classify (or 'ctrl+D' to quit): I like cheesecake
+Tokenizing input...
+Tokenized input in 0.61ms
+Performing inference...
+Inferred in 71.98ms
+(tensor([[-2.7818,  2.8868]]),)
+Sentiment prediction: POSITIVE (99.66%)
+```
+
 ### Update
 
 To avoid having to manually enter prompts in quick succession via the cli, I made `experiments/benchmark.py`.
@@ -147,10 +191,10 @@ Unfortunately the `coremltools` Python library [does not support batch inference
 We can see some expected results:
 
 ```
-$ python experiment/benchmark.py --coreml
+$ python -m experiment.benchmark --coreml
 Inferred 1821 inputs in 7980.14ms
 
-$ python experiment/benchmark.py --pytorch
+$ python -m experiment.benchmark --pytorch
 Inferred 1821 inputs in 80253.39ms
 ```
 
@@ -216,8 +260,68 @@ So, if this is measuring anything meaningful, it seems like the CoreML optimised
 
 ## Further questions
 
-We compared here the same model, `apple/ane-distilbert-base-uncased-finetuned-sst-2-english`, run via either PyTorch or CoreML.
+1. We compared here the same model, `apple/ane-distilbert-base-uncased-finetuned-sst-2-english`, run via either PyTorch or CoreML.
 
-But, as I understand it, that model is a rewrite of the original DistilBERT PyTorch model, changing some details ([as described here](https://machinelearning.apple.com/research/neural-engine-transformers)) to ensure that CoreML will be able to run it on the ANE.
+    But, as I understand it, that model is a rewrite of the original DistilBERT PyTorch model, changing some details ([as described here](https://machinelearning.apple.com/research/neural-engine-transformers)) to ensure that CoreML will be able to run it on the ANE.
 
-It's possible those changes harm the PyTorch performance?  How does say [`distilbert-base-uncased-finetuned-sst-2-english`](https://huggingface.co/distilbert-base-uncased-finetuned-sst-2-english) compare, running under PyTorch?
+    It's possible those changes harm the PyTorch performance?  How does say [`distilbert-base-uncased-finetuned-sst-2-english`](https://huggingface.co/distilbert-base-uncased-finetuned-sst-2-english) compare, running under PyTorch?
+
+2. Huggingface are working on their own wrapper for coremltools https://github.com/huggingface/exporters
+
+   Can I take the original HF `distilbert-base-uncased-finetuned-sst-2-english` and export it with that tool in a way that runs on the ANE?
+
+### 1. Testing the original non-Apple PyTorch model
+
+How well does the original `distilbert-base-uncased-finetuned-sst-2-english` model run compared to the Apple-modified version under PyTorch?
+
+I updated the benchmark script to test this. Here's the results from a single run of each:
+
+```
+$ python -m experiment.benchmark --pytorch
+Inferred 1821 inputs in 71321.61ms
+
+$ python -m experiment.benchmark --pytorch-model-name distilbert-base-uncased-finetuned-sst-2-english
+Inferred 1821 inputs in 64386.90ms
+```
+
+So the speed is comparable to the Apple-modified version, possibly a fraction faster, but still approx 8-10x slower than the CoreML version running on the ANE.
+
+### 2. Testing exported models
+
+Using https://github.com/huggingface/exporters I exported the HF `distilbert-base-uncased-finetuned-sst-2-english` model a few times with different options.
+
+e.g.
+```
+python -m exporters.coreml --model=distilbert-base-uncased-finetuned-sst-2-english \
+                           --feature=sequence-classification models/defaults.mlpackage
+```
+
+- `--compute_units=all` or `--compute_units=cpu_and_ne`
+- `--quantize=float16`
+
+Curiously the exported CoreML models loaded much faster than Apple's one:
+```
+Loaded CoreML model in 340.59ms
+```
+(vs ~4s for Apple's model)
+
+However none of them ran on the ANE. So just specifying the target compute unit and quantizing to `float16` are not enough, we need the other refactorings that Apple have made in order for that to work. (Nice to see that the quantized version 'just worked' though).
+
+And all of them ran approx 40% slower than the Apple one did under PyTorch, ~60ms per inference (vs ~44ms for Apple model under PyTorch).
+
+I haven't included the exported models in this repo but if you export your own then you can try them in the benchmark script. I got results like:
+```
+python -m experiment.benchmark --coreml-model-path models/Model.mlpackage
+Inferred 1821 inputs in 101774.21ms
+```
+
+One nice thing is the HF exporter generates a model which returns a nicer data structure from `model.predict`:
+
+```python
+{'var_482': array([[0.53114289, 0.46885711]]), 'probabilities': {'NEGATIVE': 0.5311428904533386, 'POSITIVE': 0.4688571095466614}, 'classLabel': 'NEGATIVE'}
+```
+
+i.e. you don't have to do the softmax + argmax to get probability and predicted class from the raw logits, it's already done for you.
+
+(I think this may be what the `--feature=sequence-classification` option does).
+
