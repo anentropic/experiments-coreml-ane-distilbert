@@ -15,6 +15,9 @@ We don't need to run this as we can just download the result from:
 https://huggingface.co/apple/ane-distilbert-base-uncased-finetuned-sst-2-english
 (except to test our toolchain is working - it is!)
 From that link we can derive the code in run_coreml.py
+
+In order to run this you will need to `pip install ane-transformers`
+and that will downgrade torch to 1.11 ...maybe better in a separate venv
 """
 
 model_name = "distilbert-base-uncased-finetuned-sst-2-english"

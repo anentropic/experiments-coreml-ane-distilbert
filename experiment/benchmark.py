@@ -76,7 +76,7 @@ def coreml(model_path: str | None, inputs: list[str]):
     print(f"Inferred {len(inputs)} inputs in {timing.execution_time_ns / 1e6:.2f}ms")
 
 
-def pytorch(model_name: str, inputs: list[str]):
+def pytorch(model_name: str, inputs: list[str], use_mps: bool):
     model, tokenizer = load_pytorch(model_name)
         
     logger.debug("Tokenizing inputs...")
@@ -89,6 +89,13 @@ def pytorch(model_name: str, inputs: list[str]):
         )
         for input_ in inputs
     ]
+
+    if use_mps:
+        device = torch.device("mps")
+        model.to(device)
+        for encoded in encoded_inputs:
+            encoded.to(device)
+        logger.debug("Using MPS backend")
 
     logger.debug("Performing inference...")
     with timer() as timing:
@@ -106,6 +113,7 @@ if __name__ == "__main__":
     parser.add_argument("--pytorch", action="store_true")
     parser.add_argument("--coreml-model-path", type=str, nargs="*")
     parser.add_argument("--pytorch-model-name", type=str)
+    parser.add_argument("--pytorch-use-mps", action="store_true")
     args = parser.parse_args()
 
     if not (args.coreml or args.pytorch or args.coreml_model_path or args.pytorch_model_name):
@@ -118,9 +126,9 @@ if __name__ == "__main__":
     if args.coreml:
         coreml(None, inputs)
     if args.pytorch:
-        pytorch(MODEL_REPO, inputs)
+        pytorch(MODEL_REPO, inputs, args.pytorch_use_mps)
     if args.coreml_model_path:
         for model_path in args.coreml_model_path:
             coreml(model_path, inputs)
     if args.pytorch_model_name:
-        pytorch(args.pytorch_model_name, inputs)
+        pytorch(args.pytorch_model_name, inputs, args.pytorch_use_mps)

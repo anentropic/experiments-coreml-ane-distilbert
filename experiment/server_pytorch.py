@@ -1,3 +1,4 @@
+import argparse
 import multiprocessing as mp
 import sys
 
@@ -35,18 +36,23 @@ MODEL_RESULT_KEYS = {
 }
 
 
-def child_process(conn, model_name: str):
+def child_process(conn, model_name: str, use_mps: bool):
     try:
-        mlmodel, tokenizer = load_pytorch(model_name)
+        model, tokenizer = load_pytorch(model_name)
     except:
         import traceback
         traceback.print_exc()
         conn.send(False)
         conn.close()
         return
-    else:
-        # Signal to the parent process that we are ready to receive inputs
-        conn.send(True)
+
+    device = None
+    if use_mps:
+        device = torch.device('mps')
+        model.to(device)
+
+    # Signal to the parent process that we are ready to receive inputs
+    conn.send(True)
 
     while True:
         input_str = conn.recv()
@@ -64,11 +70,14 @@ def child_process(conn, model_name: str):
                 padding="max_length",
             )
         logger.debug(f"Tokenized input in {timing.execution_time_ns / 1e6:.2f}ms")
-        
+
+        if use_mps:
+            inputs.to(device)
+
         logger.debug("Performing inference...")
         with timer() as timing:
             with torch.no_grad():
-                outputs = mlmodel(**inputs)
+                outputs = model(**inputs)
         logger.debug(f"Inferred in {timing.execution_time_ns / 1e6:.2f}ms")
 
         logger.debug(outputs)
@@ -84,10 +93,19 @@ def child_process(conn, model_name: str):
 
 
 def run_server():
-    model_name = sys.argv[1] if len(sys.argv) > 1 else MODEL_REPO
+    argparser = argparse.ArgumentParser()
+    argparser.add_argument(
+        "--model", type=str, default=MODEL_REPO,
+        help="Name of the model to load from HuggingFace"
+    )
+    argparser.add_argument(
+        "--use-mps", action="store_true",
+        help="Use the MPS backend for inference"
+    )
+    args = argparser.parse_args()
 
     parent_conn, child_conn = mp.Pipe()
-    p = mp.Process(target=child_process, args=(child_conn, model_name))
+    p = mp.Process(target=child_process, args=(child_conn, args.model, args.use_mps))
     p.start()
 
     # Wait for the child process to signal that it's ready to receive inputs

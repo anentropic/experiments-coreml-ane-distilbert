@@ -90,9 +90,9 @@ with ct.neural_engine.scope():
 
 These both look like exactly the kind of thing I want. Unfortunately it seems that neither of them actually exist 😞
 
-Googling for myself I saw a few suggestions to use a Python library [asitop](https://github.com/tlkh/asitop) and watching if the ANE starts consuming any power. (this is )
+Googling for myself I saw a few suggestions to use a Python library [asitop](https://github.com/tlkh/asitop) and watching if the ANE starts consuming any power. Fortunately most of the time the ANE is doing nothing, so we have a good baseline to observe against.
 
-I was unable to observe any flicker of power consumption from ANE when inferring individual phrases using the current `experiment/server.py`.
+I was unable to observe any flicker of power consumption from ANE in `asitop` when inferring individual phrases using the current `experiment/server.py`.
 
 Either:
 
@@ -284,7 +284,7 @@ $ python -m experiment.benchmark --pytorch-model-name distilbert-base-uncased-fi
 Inferred 1821 inputs in 64386.90ms
 ```
 
-So the speed is comparable to the Apple-modified version, possibly a fraction faster, but still approx 8-10x slower than the CoreML version running on the ANE.
+So the speed is comparable to the Apple-modified version, possibly a little faster, but still approx 8-10x slower than the CoreML version running on the ANE.
 
 ### 2. Testing exported models
 
@@ -325,3 +325,34 @@ i.e. you don't have to do the softmax + argmax to get probability and predicted 
 
 (I think this may be what the `--feature=sequence-classification` option does).
 
+## Faster PyTorch?
+
+https://towardsdatascience.com/gpu-acceleration-comes-to-pytorch-on-m1-macs-195c399efcc1
+
+> PyTorch v1.12 introduces GPU-accelerated training on Apple Silicon
+
+`ane_transformers` specifies `"torch>=1.10.0,<=1.11.0"`, perhaps specifically to avoid this? (or that was just the latest version when authored)
+
+Seems worth exploring though.
+
+https://pytorch.org/blog/introducing-accelerated-pytorch-training-on-mac/
+
+PyTorch claims 6-7x faster training and ~14x faster inference for Huggingface BERT using the Metal Performance Shaders backend on an M1 Ultra, "using batch size=64" (batch inference? training?)
+
+The previous article only achieved ~2x speedup on a regular M1 though.
+
+I added this option to both `server_pytorch` and `benchmark` scripts.
+
+I had to upgrade to PyTorch 2.0 to get it run with no warnings.
+
+The results were interesting - no speedup for the `apple/ane-distilbert-base-uncased-finetuned-sst-2-english` model, but a significant speedup for the vanilla `distilbert-base-uncased-finetuned-sst-2-english` model.
+
+```
+$ python -m experiment.benchmark --pytorch --pytorch-use-mps
+Inferred 1821 inputs in 78389.13ms
+
+$ python -m experiment.benchmark --pytorch-model-name distilbert-base-uncased-finetuned-sst-2-english --pytorch-use-mps
+Inferred 1821 inputs in 22854.41ms
+```
+
+This is down to ~12.5ms per inference, so about 3.5x faster than CPU PyTorch and only about 3x slower than the CoreML ANE-accelerated version.
