@@ -356,3 +356,34 @@ Inferred 1821 inputs in 22854.41ms
 ```
 
 This is down to ~12.5ms per inference, so about 3.5x faster than CPU PyTorch and only about 3x slower than the CoreML ANE-accelerated version.
+
+## What is this model anyway?
+
+`apple/ane-distilbert-base-uncased-finetuned-sst-2-english` is clearly derived from `distilbert-base-uncased-finetuned-sst-2-english`.
+
+But... what if I want to run a different fine-tuned DistilBERT variant on the ANE?
+
+We can see on their repo the following explanation of how the model was generated:
+
+> ...we initialize the baseline model as follows:
+```python
+import transformers
+model_name = "distilbert-base-uncased-finetuned-sst-2-english"
+baseline_model = transformers.AutoModelForSequenceClassification.from_pretrained(
+    model_name,
+    return_dict=False,
+    torchscript=True,
+).eval()
+```
+
+> Then we initialize the mathematically equivalent but optimized model, and we restore its parameters using that of the baseline model:
+```python
+from ane_transformers.huggingface import distilbert as ane_distilbert
+optimized_model = ane_distilbert.DistilBertForSequenceClassification(
+    baseline_model.config).eval()
+optimized_model.load_state_dict(baseline_model.state_dict())
+```
+
+So it's clear that we are using the weights from `distilbert-base-uncased-finetuned-sst-2-english` and plugging them into the refactored ANE model. Then there's a couple more steps to export a CoreML after that.
+
+In other words, it seems like it should be possible to export an ANE-accelerated version of any of the `bert-base` models on HuggingFace: https://huggingface.co/models?search=bert-base
