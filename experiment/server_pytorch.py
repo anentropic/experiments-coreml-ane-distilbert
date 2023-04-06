@@ -7,7 +7,7 @@ import torch
 import torch.nn.functional as F
 from loguru import logger
 
-from .loader import load_pytorch, MODEL_REPO
+from .loader import load_pytorch, MODEL_NAME
 from .utils import timer
 
 
@@ -95,7 +95,7 @@ def child_process(conn, model_name: str, use_mps: bool):
 def run_server():
     argparser = argparse.ArgumentParser()
     argparser.add_argument(
-        "--model", type=str, default=MODEL_REPO,
+        "--model", type=str, default=MODEL_NAME,
         help="Name of the model to load from HuggingFace"
     )
     argparser.add_argument(

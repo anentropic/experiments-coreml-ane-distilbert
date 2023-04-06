@@ -130,6 +130,7 @@ dmypy.json
 
 # ML models
 *.mlpackage/
+*.mlmodel
 
 # memray
 memray-benchmark.py.*.bin

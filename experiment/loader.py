@@ -5,7 +5,12 @@ import tempfile
 import coremltools as ct
 from huggingface_hub import snapshot_download, try_to_load_from_cache
 from loguru import logger
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from transformers import (
+    AutoTokenizer,
+    AutoModelForSequenceClassification,
+    PreTrainedTokenizer,
+    PreTrainedTokenizerFast,
+)
 
 from .utils import timer
 
@@ -22,16 +27,18 @@ logger.configure(handlers=[
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 
-MODEL_REPO = "apple/ane-distilbert-base-uncased-finetuned-sst-2-english"
+TokenizerT = PreTrainedTokenizer | PreTrainedTokenizerFast
+
+MODEL_NAME = "apple/ane-distilbert-base-uncased-finetuned-sst-2-english"
 
 MODEL_FILENAME = "DistilBERT_fp16.mlpackage"
 
 
 def _pre_cache():
-    if not try_to_load_from_cache(MODEL_REPO, f"{MODEL_FILENAME}/Manifest.json"):
+    if not try_to_load_from_cache(MODEL_NAME, f"{MODEL_FILENAME}/Manifest.json"):
         logger.debug("Pre-caching model in local huggingface hub...")
         snapshot_download(
-            repo_id=MODEL_REPO,
+            repo_id=MODEL_NAME,
             allow_patterns=f"{MODEL_FILENAME}/*",
         )
 
@@ -44,7 +51,10 @@ def _load_coreml_model(model_path: str) -> ct.models.MLModel:
     return model
 
 
-def load_coreml(local_path: str | None = None):
+def load_coreml(
+    local_path: str | None = None,
+    tokenizer_model_name: str = MODEL_NAME,
+) -> tuple[ct.models.MLModel, TokenizerT]:
     """
     The .mlpackage is a dir so we have to use snapshot_download to download it,
     and we have to give a local path and opt out of symlinks, otherwise the
@@ -61,7 +71,7 @@ def load_coreml(local_path: str | None = None):
                 # if present already, but won't fill it)
                 _pre_cache()
                 snapshot_path = snapshot_download(
-                    repo_id=MODEL_REPO,
+                    repo_id=MODEL_NAME,
                     allow_patterns=f"{MODEL_FILENAME}/*",
                     local_dir=tmp_dir,
                     local_dir_use_symlinks=False,
@@ -72,7 +82,7 @@ def load_coreml(local_path: str | None = None):
 
     logger.debug("Loading tokenizer...")
     with timer() as timing:
-        tokenizer = AutoTokenizer.from_pretrained(MODEL_REPO)
+        tokenizer = AutoTokenizer.from_pretrained(tokenizer_model_name)
     logger.debug(f"Loaded tokenizer in {timing.execution_time_ns / 1e6:.2f}ms")
 
     return model, tokenizer

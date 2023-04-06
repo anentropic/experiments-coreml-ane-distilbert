@@ -386,4 +386,79 @@ optimized_model.load_state_dict(baseline_model.state_dict())
 
 So it's clear that we are using the weights from `distilbert-base-uncased-finetuned-sst-2-english` and plugging them into the refactored ANE model. Then there's a couple more steps to export a CoreML after that.
 
-In other words, it seems like it should be possible to export an ANE-accelerated version of any of the `bert-base` models on HuggingFace: https://huggingface.co/models?search=bert-base
+In other words, it seems like it should be possible to export an ANE-accelerated version of any of the `distilbert-base` models on HuggingFace: https://huggingface.co/models?search=distilbert-base
+
+Curiously, APPLE don't mention this DistilBERT-SST2 model on their page of official CoreML models:  
+https://developer.apple.com/machine-learning/models/
+
+But one they do mention is a `BERT-SQuAD` model, converted to FP16. Let's try it!
+
+### Apple BERT-SQuAD (CoreML)
+
+First download the BERT-SQuAD model:  
+https://ml-assets.apple.com/coreml/models/Text/QuestionAnswering/BERT_SQUAD/BERTSQUADFP16.mlmodel
+
+One question which confronts us early on is which tokenizer to use?
+
+[Apple docs](https://developer.apple.com/documentation/coreml/model_integration_samples/finding_answers_to_questions_in_a_text_document#3640366) have this clue:
+
+> For example, the first token, `"[PAD]"`, has an ID of 0, and the 5,001st token, `"knight"`, has an ID of 5000.
+
+A quick check of the HF tokenizers:
+
+```python
+In [1]: from transformers import AutoTokenizer
+
+In [2]: tokenizer = AutoTokenizer.from_pretrained("bert-base-cased")
+
+In [3]: tokenizer.vocab["knight"]
+Out[3]: 11295
+
+In [4]: tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+
+In [5]: tokenizer.vocab["knight"]
+Out[5]: 5000
+
+In [6]: tokenizer.vocab["[PAD]"]
+Out[6]: 0
+```
+
+...reveals it appears to use `bert-base-uncased` 🤗
+
+The question-answering task is different from sentiment classification, as we need two inputs (a 'context' paragraph, and your actual question). So I have made a new server script just for this:
+
+```
+$ python -m experiment.server_coreml_squad models/BERTSQUADFP16.mlmodel
+Loading CoreML model 'models/BERTSQUADFP16.mlmodel'...
+Loaded CoreML model in 12527.68ms
+Loading tokenizer...
+Loaded tokenizer in 157.96ms
+Enter your context (or 'ctrl+D' to quit):
+Using default context: "My name is Paul and I live in Cambridge"
+Enter your question (or 'ctrl+D' to quit):
+Using default question: "Where do I live?"
+Tokenizing input...
+Tokenized input in 0.95ms
+Performing inference...
+Inferred in 325.41ms
+Answer: cambridge
+```
+
+It's unfortunate that it was built with the uncased tokenizer, which I assume is why we get a lowercase response.
+
+Anyway, we can see the model takes ~12.5s to load and inference takes ~300ms.
+
+Using `sudo powermetrics --sample-rate=300 | grep -i "ANE Power"` again, we can see that this model is running on the ANE (nice!):
+
+```
+ANE Power: 0 mW
+ANE Power: 0 mW
+ANE Power: 828 mW
+ANE Power: 350 mW
+ANE Power: 0 mW
+ANE Power: 0 mW
+```
+
+It's interesting that this both gives a larger ANE power spike and is also much slower to load and infer than the DistilBERT-SST2 model. I don't think BERT vs DistilBERT should make so much difference. The model file is ~200MB so it's too small to think that it's based on `bert-large` (a 340M param model).
+
+Is question-answering just more intensive?  Or the model is less efficient somehow, despite apparently making heavy use of the Neural Engine?

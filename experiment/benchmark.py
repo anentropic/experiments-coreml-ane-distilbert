@@ -6,7 +6,7 @@ import torch
 from datasets import load_dataset
 from loguru import logger
 
-from .loader import load_coreml, load_pytorch, MODEL_REPO
+from .loader import load_coreml, load_pytorch, MODEL_NAME
 from .utils import timer
 
 
@@ -126,7 +126,7 @@ if __name__ == "__main__":
     if args.coreml:
         coreml(None, inputs)
     if args.pytorch:
-        pytorch(MODEL_REPO, inputs, args.pytorch_use_mps)
+        pytorch(MODEL_NAME, inputs, args.pytorch_use_mps)
     if args.coreml_model_path:
         for model_path in args.coreml_model_path:
             coreml(model_path, inputs)
